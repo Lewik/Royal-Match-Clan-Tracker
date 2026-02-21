@@ -14,7 +14,7 @@ snapshots = c.execute("SELECT id, date FROM snapshots ORDER BY date").fetchall()
 snap_dates = [s['date'] for s in snapshots]
 snap_ids = [s['id'] for s in snapshots]
 
-PROTECTED_MEMBERS = {'Lewik', 'Irina', 'Daminor'}
+PROTECTED_MEMBERS = {'Lewik', 'Irina', 'Daminor', 'yaroslav'}
 
 all_members = c.execute(
     "SELECT snapshot_id, position, name, help, level, source_file FROM members ORDER BY snapshot_id, position"
