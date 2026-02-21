@@ -127,7 +127,7 @@ for p in players:
         d = p['recent_delta']
         delta_str = f"+{d}" if d > 0 else str(d)
     elif p['is_new']:
-        delta_str = "new"
+        delta_str = "нов."
     else:
         delta_str = "—"
     cells += f'<td class="delta">{delta_str}</td>'
@@ -280,15 +280,15 @@ html = f"""<!DOCTYPE html>
 <body>
 <h1>Three Stripes</h1>
 <div class="meta">
-  {snap_dates[0]} &rarr; {snap_dates[-1]} &middot; {len(snap_dates)} snapshots &middot; Generated {generated}
+  {snap_dates[0]} &rarr; {snap_dates[-1]} &middot; {len(snap_dates)} снапшотов &middot; Обновлено {generated}
 </div>
 <div class="stats">
-  <span>Members: {total}</span>
-  <span style="color:#f66">Inactive: {inactive_count}</span>
+  <span>Участников: {total}</span>
+  <span style="color:#f66">Неактивных: {inactive_count}</span>
 </div>
 
 <div class="chart-container">
-  <h2>Level progression</h2>
+  <h2>Прогресс по уровням</h2>
   <canvas id="levelChart"></canvas>
 </div>
 
@@ -297,12 +297,12 @@ html = f"""<!DOCTYPE html>
 <thead>
   <tr>
     <th rowspan="2">#</th>
-    <th rowspan="2">Name</th>
+    <th rowspan="2">Имя</th>
     {date_headers}
     <th rowspan="2">&Delta;</th>
   </tr>
   <tr>
-    {''.join('<th>Lvl</th><th>Help</th>' for _ in snap_dates)}
+    {''.join('<th>Ур.</th><th>Пом.</th>' for _ in snap_dates)}
   </tr>
 </thead>
 <tbody>
@@ -347,7 +347,7 @@ new Chart(document.getElementById('levelChart'), {{
       tooltip: {{
         callbacks: {{
           label: function(ctx) {{
-            return ctx.dataset.label + ': level ' + ctx.parsed.y;
+            return ctx.dataset.label + ': уровень ' + ctx.parsed.y;
           }}
         }}
       }}
@@ -362,7 +362,7 @@ new Chart(document.getElementById('levelChart'), {{
         grid: {{ color: '#333' }},
         title: {{
           display: true,
-          text: 'Level',
+          text: 'Уровень',
           color: '#666',
         }}
       }}
