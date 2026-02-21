@@ -112,7 +112,7 @@ for p in players:
     if is_protected:
         row_class += " protected"
 
-    shield = ' <span class="shield">&#128274;</span>' if is_protected else ''
+    shield = ' <span class="shield" title="Защищённый игрок — не будет исключён на общих условиях">&#128274;</span>' if is_protected else ''
     cells = f'<td>{p["latest_position"]}</td><td>{p["display_name"]}{shield}</td>'
     for sid in snap_ids:
         if sid in p['history']:
@@ -127,7 +127,7 @@ for p in players:
         d = p['recent_delta']
         delta_str = f"+{d}" if d > 0 else str(d)
     elif p['is_new']:
-        delta_str = "нов."
+        delta_str = "новый"
     else:
         delta_str = "—"
     cells += f'<td class="delta">{delta_str}</td>'
@@ -269,6 +269,25 @@ html = f"""<!DOCTYPE html>
   .shield {{
     font-size: 0.75em;
   }}
+  .rules {{
+    background: #16213e;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+    color: #bbb;
+  }}
+  .rules h2 {{
+    font-size: 1.1em;
+    margin-bottom: 10px;
+    color: #aaa;
+  }}
+  .rules ul {{
+    margin: 8px 0 8px 20px;
+  }}
+  .rules b {{
+    color: #f66;
+  }}
   @media (max-width: 600px) {{
     body {{ padding: 10px; }}
     td, th {{ padding: 6px 4px; font-size: 0.8em; }}
@@ -292,6 +311,16 @@ html = f"""<!DOCTYPE html>
   <canvas id="levelChart"></canvas>
 </div>
 
+<div class="rules">
+  <h2>Правила исключения</h2>
+  <p>Игрок считается <b>неактивным</b> и может быть исключён, если за период между двумя последними снапшотами:</p>
+  <ul>
+    <li>Уровень не изменился (дельта = 0)</li>
+    <li>Помощь = 0 в последнем снапшоте</li>
+  </ul>
+  <p>Игроки с &#128274; защищены и не исключаются на общих условиях.</p>
+</div>
+
 <div class="table-wrap">
 <table>
 <thead>
@@ -299,10 +328,10 @@ html = f"""<!DOCTYPE html>
     <th rowspan="2">#</th>
     <th rowspan="2">Имя</th>
     {date_headers}
-    <th rowspan="2">&Delta;</th>
+    <th rowspan="2">Результат<br><small>{snap_dates[-2]} &rarr; {snap_dates[-1]}</small></th>
   </tr>
   <tr>
-    {''.join('<th>Ур.</th><th>Пом.</th>' for _ in snap_dates)}
+    {''.join('<th>Уровень</th><th>Помощь</th>' for _ in snap_dates)}
   </tr>
 </thead>
 <tbody>
