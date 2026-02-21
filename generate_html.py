@@ -284,8 +284,11 @@ html = f"""<!DOCTYPE html>
   }}
   .rules h2 {{
     font-size: 1.1em;
-    margin-bottom: 10px;
+    margin: 15px 0 10px;
     color: #aaa;
+  }}
+  .rules h2:first-child {{
+    margin-top: 0;
   }}
   .rules ul {{
     margin: 8px 0 8px 20px;
