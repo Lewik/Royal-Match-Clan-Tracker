@@ -322,7 +322,8 @@ html = f"""<!DOCTYPE html>
     <canvas id="levelChart"></canvas>
   </div>
   <div class="rules">
-    <p style="color:#666; font-size:0.85em;">Обновлено {generated}</p>
+    <h2>Последнее обновление</h2>
+    <p><span id="lastUpdate" data-date="{snap_dates[-1]}">{snap_dates[-1]}</span></p>
     <h2>О клане</h2>
     <p>Three Stripes — русскоязычный клан для тех, кто играет в удовольствие. Никакого хардкора, просто заходим и кайфуем.</p>
     <h2>Активность</h2>
@@ -413,6 +414,12 @@ new Chart(document.getElementById('levelChart'), {{
     }}
   }}
 }});
+
+const el = document.getElementById('lastUpdate');
+const d = new Date(el.dataset.date);
+const diff = Math.floor((new Date() - d) / 86400000);
+const days = diff === 0 ? 'сегодня' : diff === 1 ? '1 день назад' : diff < 5 ? diff + ' дня назад' : diff + ' дней назад';
+el.textContent = el.dataset.date + ' (' + days + ')';
 </script>
 </body>
 </html>
