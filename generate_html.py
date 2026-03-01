@@ -144,14 +144,12 @@ palette = [
 ]
 
 for i, p in enumerate(players):
-    if len(p['history']) < 2:
+    if len(p['history']) < 2 or snap_ids[-1] not in p['history']:
         continue
     data_points = []
     for sid, date in zip(snap_ids, snap_dates):
         if sid in p['history']:
             data_points.append({'x': date, 'y': p['history'][sid]['level']})
-        else:
-            data_points.append(None)
 
     color = '#f66' if p['inactive'] else palette[i % len(palette)]
     chart_datasets.append({
@@ -162,7 +160,6 @@ for i, p in enumerate(players):
         'borderWidth': p['inactive'] and 1 or 2,
         'pointRadius': 4,
         'tension': 0.3,
-        'spanGaps': True,
     })
 
 date_headers = ''.join(f'<th colspan="2">{d}</th>' for d in snap_dates)
