@@ -14,12 +14,17 @@ snapshots = c.execute("SELECT id, date FROM snapshots ORDER BY date").fetchall()
 snap_dates = [s['date'] for s in snapshots]
 snap_ids = [s['id'] for s in snapshots]
 
-PROTECTED_MEMBERS = {'Lewik', 'Irina', 'Daminor', 'yaroslav', 'ARTEM', 'NASTENKA51', '1959'}
+PROTECTED_MEMBERS = {'Lewik', 'Irina', 'Daminor', 'yaroslav', 'ARTEM', 'NASTENKA31', '1959'}
 MAX_LEVEL = 13100
 
 all_members = c.execute(
-    "SELECT snapshot_id, position, name, help, level, source_file, league_crowns, league_max_crowns, league_wins FROM members ORDER BY snapshot_id, position"
+    "SELECT snapshot_id, position, name, help, level, source_file, league_crowns, league_max_crowns, league_wins, game_start_date, profile_wins, profile_help_given, profile_help_received, profile_territories, profile_collections, profile_sets FROM members ORDER BY snapshot_id, position"
 ).fetchall()
+
+last_profile_date = c.execute(
+    "SELECT s.date FROM snapshots s JOIN members m ON m.snapshot_id = s.id WHERE m.profile_wins IS NOT NULL ORDER BY s.date DESC LIMIT 1"
+).fetchone()
+last_profile_date = last_profile_date[0] if last_profile_date else None
 conn.close()
 
 player_history = {}
@@ -32,9 +37,9 @@ for m in all_members:
         key = f"{name}#{m['level']}"
         if key not in player_history:
             player_history[key] = {}
-        player_history[key][snap_id] = {'level': m['level'], 'help': m['help'], 'position': m['position'], 'source_file': m['source_file'], 'league_crowns': m['league_crowns'], 'league_max_crowns': m['league_max_crowns'], 'league_wins': m['league_wins']}
+        player_history[key][snap_id] = {'level': m['level'], 'help': m['help'], 'position': m['position'], 'source_file': m['source_file'], 'league_crowns': m['league_crowns'], 'league_max_crowns': m['league_max_crowns'], 'league_wins': m['league_wins'], 'game_start_date': m['game_start_date'], 'profile_wins': m['profile_wins'], 'profile_help_given': m['profile_help_given'], 'profile_help_received': m['profile_help_received'], 'profile_territories': m['profile_territories'], 'profile_collections': m['profile_collections'], 'profile_sets': m['profile_sets']}
     else:
-        player_history[name][snap_id] = {'level': m['level'], 'help': m['help'], 'position': m['position'], 'source_file': m['source_file'], 'league_crowns': m['league_crowns'], 'league_max_crowns': m['league_max_crowns'], 'league_wins': m['league_wins']}
+        player_history[name][snap_id] = {'level': m['level'], 'help': m['help'], 'position': m['position'], 'source_file': m['source_file'], 'league_crowns': m['league_crowns'], 'league_max_crowns': m['league_max_crowns'], 'league_wins': m['league_wins'], 'game_start_date': m['game_start_date'], 'profile_wins': m['profile_wins'], 'profile_help_given': m['profile_help_given'], 'profile_help_received': m['profile_help_received'], 'profile_territories': m['profile_territories'], 'profile_collections': m['profile_collections'], 'profile_sets': m['profile_sets']}
 
 
 def resolve_duplicates(player_history, snap_ids):
@@ -110,11 +115,142 @@ has_league_data = any(
 table_snap_ids = snap_ids[-3:]
 table_snap_dates = snap_dates[-3:]
 
+# --- Birthdays (game start anniversaries by month) ---
+from datetime import date
+today = date.today()
+MONTH_NAMES = {
+    1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
+    5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
+    9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь',
+}
+by_month = {}
+for p in players:
+    if snap_ids[-1] not in p['history']:
+        continue
+    gsd = p['history'][snap_ids[-1]].get('game_start_date')
+    if not gsd:
+        continue
+    parts = gsd.split('/')
+    if len(parts) != 2:
+        continue
+    start_month, start_year = int(parts[0]), int(parts[1])
+    years = today.year - start_year
+    if start_month > today.month:
+        years -= 1
+    if years <= 0:
+        continue
+    by_month.setdefault(start_month, []).append({
+        'name': p['display_name'],
+        'years': years,
+    })
+
+current_month_players = by_month.get(today.month, [])
+if current_month_players:
+    birthday_month = today.month
+else:
+    for offset in range(1, 13):
+        m = (today.month - 1 + offset) % 12 + 1
+        if m in by_month:
+            birthday_month = m
+            break
+    else:
+        birthday_month = None
+
+birthday_html = ''
+if birthday_month is not None:
+    bday_players = by_month[birthday_month]
+    is_current = birthday_month == today.month
+    month_label = MONTH_NAMES[birthday_month]
+    if is_current:
+        birthday_html += f'<li style="color:#f5c842;margin-bottom:6px">В этом месяце ({month_label}):</li>\n'
+    else:
+        birthday_html += f'<li style="color:#f5c842;margin-bottom:6px">Ближайшие — {month_label}:</li>\n'
+    for b in sorted(bday_players, key=lambda x: -x['years']):
+        suffix = {1: 'год', 2: 'года', 3: 'года', 4: 'года'}.get(b['years'] % 10, 'лет')
+        if 11 <= b['years'] % 100 <= 14:
+            suffix = 'лет'
+        birthday_html += f'<li><strong>{b["name"]}</strong> — {b["years"]} {suffix} в игре</li>\n'
+
+# --- Fun facts ---
+current_players = [p for p in players if snap_ids[-1] in p['history']]
+latest_data = {p['display_name']: p['history'][snap_ids[-1]] for p in current_players}
+facts = []
+
+def parse_gsd(gsd):
+    if not gsd:
+        return (9999, 99)
+    parts = gsd.split('/')
+    return (int(parts[1]), int(parts[0]))
+
+def fmt(n):
+    return f'{n:,}'.replace(',', '\u2009')
+
+top_help = max(latest_data.items(), key=lambda x: x[1].get('profile_help_given') or 0)
+if top_help[1].get('profile_help_given'):
+    facts.append(f'<strong>{top_help[0]}</strong> — монстр помощи: {fmt(top_help[1]["profile_help_given"])} отправлено, {fmt(top_help[1]["profile_help_received"])} получено')
+
+most_independent = max(
+    ((n, d) for n, d in latest_data.items() if (d.get('profile_help_given') or 0) > 0 and (d.get('profile_help_received') or 0) > 0),
+    key=lambda x: (x[1]['profile_help_given'] / x[1]['profile_help_received']),
+    default=None
+)
+if most_independent:
+    ratio = most_independent[1]['profile_help_given'] / most_independent[1]['profile_help_received']
+    facts.append(f'<strong>{most_independent[0]}</strong> — самостоятельный: отдаёт в {ratio:.0f}× больше помощи, чем получает')
+
+lone_wolves = [n for n, d in latest_data.items() if (d.get('profile_help_given') or 0) == 0 and (d.get('profile_help_received') or 0) == 0]
+if lone_wolves:
+    facts.append(f'<strong>{", ".join(lone_wolves)}</strong> — волк-одиночка: 0 помощи в обе стороны')
+
+fastest = None
+for n, d in latest_data.items():
+    gsd = d.get('game_start_date')
+    if not gsd:
+        continue
+    parts = gsd.split('/')
+    start = date(int(parts[1]), int(parts[0]), 1)
+    months = (today.year - start.year) * 12 + today.month - start.month
+    if months <= 0:
+        continue
+    lvl_per_month = (d.get('level') or 0) / months
+    if fastest is None or lvl_per_month > fastest[1]:
+        fastest = (n, lvl_per_month, d.get('level'), months)
+if fastest:
+    facts.append(f'<strong>{fastest[0]}</strong> — самый быстрый: {fmt(fastest[2])} уровней за {fastest[3]} мес. ({fastest[1]:.0f}/мес.)')
+
+slowest = None
+for n, d in latest_data.items():
+    gsd = d.get('game_start_date')
+    if not gsd:
+        continue
+    parts = gsd.split('/')
+    start = date(int(parts[1]), int(parts[0]), 1)
+    months = (today.year - start.year) * 12 + today.month - start.month
+    if months < 6:
+        continue
+    lvl_per_month = (d.get('level') or 0) / months
+    if slowest is None or lvl_per_month < slowest[1]:
+        slowest = (n, lvl_per_month, d.get('level'), months)
+if slowest:
+    facts.append(f'<strong>{slowest[0]}</strong> — самый неторопливый: {fmt(slowest[2])} уровней за {slowest[3]} мес. ({slowest[1]:.0f}/мес.)')
+
+oldest = min(latest_data.items(), key=lambda x: parse_gsd(x[1].get('game_start_date')))
+if oldest[1].get('game_start_date'):
+    parts = oldest[1]['game_start_date'].split('/')
+    start = date(int(parts[1]), int(parts[0]), 1)
+    months = (today.year - start.year) * 12 + today.month - start.month
+    years = months // 12
+    rem = months % 12
+    age = f'{years} г. {rem} мес.' if rem else f'{years} г.'
+    facts.append(f'<strong>{oldest[0]}</strong> — самый давний игрок ({age}, с {oldest[1]["game_start_date"]})')
+
+facts_html = '\n'.join(f'<li>{f}</li>' for f in facts)
+
 # --- Table rows ---
 rows_html = []
 max_level_separator_added = False
 league_cols = 3 if has_league_data else 0
-total_cols = 2 + len(table_snap_ids) * 2 + league_cols + 1
+total_cols = 3 + len(table_snap_ids) * 2 + league_cols + 1
 for p in players:
     if snap_ids[-1] not in p['history']:
         continue
@@ -129,7 +265,12 @@ for p in players:
         row_class += " protected"
 
     shield = ' <span class="shield" title="Защищённый игрок — не будет исключён на общих условиях">&#128274;</span>' if is_protected else ''
-    cells = f'<td>{p["latest_position"]}</td><td>{p["display_name"]}{shield}</td>'
+    game_start = None
+    for sid in reversed(snap_ids):
+        if sid in p['history'] and p['history'][sid].get('game_start_date'):
+            game_start = p['history'][sid]['game_start_date']
+            break
+    cells = f'<td>{p["latest_position"]}</td><td>{p["display_name"]}{shield}</td><td class="na">{game_start or "—"}</td>'
     for sid in table_snap_ids:
         if sid in p['history']:
             h = p['history'][sid]
@@ -385,13 +526,6 @@ html = f"""<!DOCTYPE html>
 </head>
 <body>
 <h1>Three Stripes</h1>
-<div class="meta">
-  {snap_dates[0]} &rarr; {snap_dates[-1]} &middot; {len(snap_dates)} снапшотов
-</div>
-<div class="stats">
-  <span>Участников: {total}</span>
-  <span style="color:#f66">Неактивных: {inactive_count}</span>
-</div>
 
 <div class="top-grid">
   <div class="chart-container">
@@ -399,8 +533,9 @@ html = f"""<!DOCTYPE html>
     <canvas id="levelChart"></canvas>
   </div>
   <div class="rules">
-    <h2>Последнее обновление данных</h2>
-    <p><span id="lastUpdate" data-date="{snap_dates[-1]}">{snap_dates[-1]}</span></p>
+    <h2>Последнее обновление</h2>
+    <p>Список: <span id="lastUpdate" data-date="{snap_dates[-1]}">{snap_dates[-1]}</span></p>
+    <p>Профили: <span id="lastProfileUpdate" data-date="{last_profile_date or ''}">{last_profile_date or '—'}</span></p>
     <h2>О клане</h2>
     <p>Three Stripes — русскоязычный клан для тех, кто играет в удовольствие. Никакого хардкора, просто заходим и кайфуем.</p>
     <h2>Активность</h2>
@@ -414,12 +549,28 @@ html = f"""<!DOCTYPE html>
   </div>
 </div>
 
+<div class="top-grid">
+  <div class="rules">
+    <h2>&#127874; Королевские дни рождения</h2>
+    <ul>
+      {birthday_html}
+    </ul>
+  </div>
+  <div class="rules">
+    <h2>&#127942; Интересные факты</h2>
+    <ul>
+      {facts_html}
+    </ul>
+  </div>
+</div>
+
 <div class="table-wrap">
 <table>
 <thead>
   <tr>
     <th rowspan="2">#</th>
     <th rowspan="2">Имя</th>
+    <th rowspan="2">В игре с</th>
     {date_headers}
     {league_headers_top}
     <th rowspan="2">Результат<br><small>{table_snap_dates[-2]} &rarr; {table_snap_dates[-1]}</small></th>
@@ -495,11 +646,15 @@ new Chart(document.getElementById('levelChart'), {{
   }}
 }});
 
-const el = document.getElementById('lastUpdate');
-const d = new Date(el.dataset.date);
-const diff = Math.floor((new Date() - d) / 86400000);
-const days = diff === 0 ? 'сегодня' : diff === 1 ? '1 день назад' : diff < 5 ? diff + ' дня назад' : diff + ' дней назад';
-el.textContent = el.dataset.date + ' (' + days + ')';
+function formatAgo(el) {{
+  if (!el || !el.dataset.date) return;
+  const d = new Date(el.dataset.date);
+  const diff = Math.floor((new Date() - d) / 86400000);
+  const days = diff === 0 ? 'сегодня' : diff === 1 ? '1 день назад' : diff < 5 ? diff + ' дня назад' : diff + ' дней назад';
+  el.textContent = el.dataset.date + ' (' + days + ')';
+}}
+formatAgo(document.getElementById('lastUpdate'));
+formatAgo(document.getElementById('lastProfileUpdate'));
 
 const overlay = document.getElementById('imgOverlay');
 function showImgs(srcList) {{
@@ -516,6 +671,9 @@ function closeOverlay() {{
 overlay.addEventListener('click', closeOverlay);
 document.addEventListener('keydown', (e) => {{ if (e.key === 'Escape') closeOverlay(); }});
 </script>
+<footer class="meta" style="text-align:center;color:#4a5a80;font-size:0.8em;margin-top:20px;padding:10px">
+  {snap_dates[0]} &rarr; {snap_dates[-1]} &middot; {len(snap_dates)} снапшотов
+</footer>
 </body>
 </html>
 """
