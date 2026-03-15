@@ -18,7 +18,7 @@ PROTECTED_MEMBERS = {'Lewik', 'Irina', 'Daminor', 'yaroslav', 'ARTEM', 'NASTENKA
 MAX_LEVEL = 13100
 
 all_members = c.execute(
-    "SELECT snapshot_id, position, name, help, level, source_file, league_crowns, league_max_crowns, league_wins, game_start_date, profile_wins, profile_help_given, profile_help_received, profile_territories, profile_collections, profile_sets FROM members ORDER BY snapshot_id, position"
+    "SELECT m.snapshot_id, m.position, m.name, m.help, m.level, m.source_file, m.league_crowns, m.league_max_crowns, m.league_wins, m.game_start_date, m.profile_wins, m.profile_help_given, m.profile_help_received, m.profile_territories, m.profile_collections, m.profile_sets, m.player_id, p.name as player_name FROM members m LEFT JOIN players p ON m.player_id = p.id ORDER BY m.snapshot_id, m.position"
 ).fetchall()
 
 last_profile_date = c.execute(
@@ -28,45 +28,19 @@ last_profile_date = last_profile_date[0] if last_profile_date else None
 conn.close()
 
 player_history = {}
+player_names = {}
 for m in all_members:
-    name = m['name']
+    pid = m['player_id']
+    if pid is None:
+        continue
     snap_id = m['snapshot_id']
-    if name not in player_history:
-        player_history[name] = {}
-    if name in player_history and snap_id in player_history[name]:
-        key = f"{name}#{m['level']}"
-        if key not in player_history:
-            player_history[key] = {}
-        player_history[key][snap_id] = {'level': m['level'], 'help': m['help'], 'position': m['position'], 'source_file': m['source_file'], 'league_crowns': m['league_crowns'], 'league_max_crowns': m['league_max_crowns'], 'league_wins': m['league_wins'], 'game_start_date': m['game_start_date'], 'profile_wins': m['profile_wins'], 'profile_help_given': m['profile_help_given'], 'profile_help_received': m['profile_help_received'], 'profile_territories': m['profile_territories'], 'profile_collections': m['profile_collections'], 'profile_sets': m['profile_sets']}
-    else:
-        player_history[name][snap_id] = {'level': m['level'], 'help': m['help'], 'position': m['position'], 'source_file': m['source_file'], 'league_crowns': m['league_crowns'], 'league_max_crowns': m['league_max_crowns'], 'league_wins': m['league_wins'], 'game_start_date': m['game_start_date'], 'profile_wins': m['profile_wins'], 'profile_help_given': m['profile_help_given'], 'profile_help_received': m['profile_help_received'], 'profile_territories': m['profile_territories'], 'profile_collections': m['profile_collections'], 'profile_sets': m['profile_sets']}
-
-
-def resolve_duplicates(player_history, snap_ids):
-    resolved = {}
-    for name, history in player_history.items():
-        if '#' in name:
-            continue
-        resolved[name] = history
-
-    for name, history in player_history.items():
-        if '#' not in name:
-            continue
-        base_name = name.split('#')[0]
-        if base_name not in resolved:
-            resolved[base_name] = history
-        else:
-            existing = resolved[base_name]
-            merged_key = name
-            resolved[merged_key] = history
-
-    return resolved
-
-
-player_history = resolve_duplicates(player_history, snap_ids)
+    if pid not in player_history:
+        player_history[pid] = {}
+    player_history[pid][snap_id] = {'level': m['level'], 'help': m['help'], 'position': m['position'], 'source_file': m['source_file'], 'league_crowns': m['league_crowns'], 'league_max_crowns': m['league_max_crowns'], 'league_wins': m['league_wins'], 'game_start_date': m['game_start_date'], 'profile_wins': m['profile_wins'], 'profile_help_given': m['profile_help_given'], 'profile_help_received': m['profile_help_received'], 'profile_territories': m['profile_territories'], 'profile_collections': m['profile_collections'], 'profile_sets': m['profile_sets']}
+    player_names[pid] = m['player_name'] or m['name']
 
 players = []
-for name, history in player_history.items():
+for pid, history in player_history.items():
     latest_snap = max(history.keys())
     latest = history[latest_snap]
 
@@ -86,10 +60,11 @@ for name, history in player_history.items():
 
     inactive = has_latest and recent_delta is not None and recent_delta == 0 and latest_help == 0
 
-    display_name = name.split('#')[0] if '#' in name else name
+    display_name = player_names[pid]
 
     players.append({
-        'name': name,
+        'pid': pid,
+        'name': display_name,
         'display_name': display_name,
         'history': history,
         'latest_level': latest['level'],
